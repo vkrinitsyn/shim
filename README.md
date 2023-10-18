@@ -1,2 +1,2 @@
 # shim
-Sliding Window of Histogram timeframe
+Sliding Window of average timeframe with percentiles

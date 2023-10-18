@@ -1,0 +1,21 @@
+[package]
+name = "shim"
+version = "0.1.0"
+edition = "2021"
+authors = ["V.K."]
+license = "MIT OR Apache-2.0"
+description = "A collection of histogram data structures"
+homepage = "https://github.com/vkrinitsyn/shim.git"
+repository = "https://github.com/vkrinitsyn/shim.git"
+
+#[dependencies]
+#thiserror = "1.0.47"
+#tokio = { version = "1.32.0", features = ["sync" ] }
+
+#[dev-dependencies]
+#criterion = "0.5.1"
+
+
+#[features]
+#default = ["tokio"]
+#tokio = [ ]
