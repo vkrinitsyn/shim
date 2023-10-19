@@ -42,8 +42,12 @@ impl Scale {
 
     #[inline]
     fn add(&mut self, value: &Self) {
-        self.count += value.count;
-        self.power += value.power;
+        if u32::MAX - self.count > value.count {
+            self.count += value.count;
+        }
+        if u32::MAX - self.power > value.power {
+            self.power += value.power;
+        }
         self.append(value.sum);
     }
 
@@ -228,7 +232,8 @@ impl Histogram {
          }
 
          // check to evict
-         if self.buckets.len() > 1 && self.buckets.back().unwrap().time > self.config.live_time_sec as u32 {
+         if self.buckets.len() > 1 && self.config.live_time_sec > 0
+             && self.buckets.back().unwrap().time > self.config.live_time_sec as u32 {
              let b = &self.buckets.pop_back().unwrap();
              if b.range.min_max.0 < self.range.min_max.0 || b.range.min_max.1 > self.range.min_max.1 {
 
@@ -249,14 +254,23 @@ impl Histogram {
 
     }
 
-    pub fn average(&self) -> u64 {
+    pub fn median(&self) -> u64 {
         let min = self.range.min_max.0;
         min + (self.range.min_max.1 - min) / 2
     }
 
-    pub fn average_lt(&self) -> u64 {
+    pub fn median_lt(&self) -> u64 {
         let min = self.range_lifetime.min_max.0;
         min + (self.range_lifetime.min_max.1 - min) / 2
+    }
+
+    ///
+    pub fn average(&self) -> u64 {
+        let mut r = Scale { sum: 0, power: 0, count: 0 };
+        for b in &self.buckets {
+            r.add(&b.scale[0])
+        }
+        r.avg()
     }
 
     ///
@@ -299,11 +313,13 @@ mod tests {
 
     #[test]
     fn test() {
+        // let power = u64::MAX as u128 * u32::MAX as u128;
+        // assert!(power > u64::MAX as u128);
         let mut h = Histogram::new(Config::default());
         h.append(0);
-        assert_eq!(h.average(), 0);
+        assert_eq!(h.median(), 0);
         h.append(2);
-        assert_eq!(h.average(), 1);
+        assert_eq!(h.median(), 1);
     }
 
     #[test]
@@ -315,14 +331,15 @@ mod tests {
         });
         h.append(0);
         h.append(100);
-        assert_eq!(h.average(), 50);
-        for x in 1..100 {
+        assert_eq!(h.median(), 50);
+        for x in 1..101 {
             h.append(x);
         }
+        assert_eq!(h.median(), 50);
         assert_eq!(h.average(), 50);
         assert_eq!(h.average_p(95).unwrap(), 48);
         assert_eq!(h.average_p(0 /* by index */).unwrap(), 48);
-        assert_eq!(h.sample_count(), 101);
+        assert_eq!(h.sample_count(), 102);
         assert_eq!(h.sample_count_p(95).unwrap(), 96);
 
     }
