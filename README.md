@@ -1,5 +1,5 @@
 # shim
-Sliding Window of average timeframe with percentiles
+Sliding Window of average timeframe with percentiles calculation 
 
 
 

@@ -54,7 +54,11 @@ impl Scale {
     #[inline]
     fn avg(&self) -> u64 {
         let power = u64::MAX as u128 * self.power as u128;
-        ((self.sum as u128 + power) / self.count as u128) as u64
+        if self.count > 0 {
+            ((self.sum as u128 + power) / self.count as u128) as u64
+        } else {
+            0
+        }
     }
 
 }
@@ -256,7 +260,11 @@ impl Histogram {
 
     pub fn median(&self) -> u64 {
         let min = self.range.min_max.0;
-        min + (self.range.min_max.1 - min) / 2
+        if min <= self.range.min_max.1 {
+            min + (self.range.min_max.1 - min) / 2
+        } else {
+            0
+        }
     }
 
     pub fn median_lt(&self) -> u64 {
@@ -341,7 +349,6 @@ mod tests {
         assert_eq!(h.average_p(0 /* by index */).unwrap(), 48);
         assert_eq!(h.sample_count(), 102);
         assert_eq!(h.sample_count_p(95).unwrap(), 96);
-
     }
 
 }
