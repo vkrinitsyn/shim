@@ -1,5 +1,15 @@
 # shim
+
+[![ci](https://github.com/vkrinitsyn/shim/actions/workflows/ci.yml/badge.svg)](https://github.com/vkrinitsyn/shim/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/vkrinitsyn/shim/graph/badge.svg)](https://codecov.io/gh/vkrinitsyn/shim)
+[![audit](https://github.com/vkrinitsyn/shim/actions/workflows/audit.yml/badge.svg)](https://github.com/vkrinitsyn/shim/actions/workflows/audit.yml)
+[![crates.io](https://img.shields.io/crates/v/shims.svg)](https://crates.io/crates/shims)
+[![docs.rs](https://docs.rs/shims/badge.svg)](https://docs.rs/shims)
+
 Sliding Window of average timeframe with percentiles calculation 
+
+> [!NOTE]
+> Provided by [DBinvent](https://www.dbinvent.com), the infinite-scale Postgres solution.
 
 
 
@@ -29,8 +39,8 @@ Sliding Window of average timeframe with percentiles calculation
         }
         assert_eq!(h.median(), 50);
         assert_eq!(h.average(), 50);
-        assert_eq!(h.average_p(95).unwrap(), 48);
-        assert_eq!(h.average_p(0 /* by index */).unwrap(), 48);
+        assert_eq!(h.average_p(95).unwrap(), 49);
+        assert_eq!(h.average_p(0 /* by index */).unwrap(), 49);
         assert_eq!(h.sample_count(), 102);
         assert_eq!(h.sample_count_p(95).unwrap(), 96);
     }
