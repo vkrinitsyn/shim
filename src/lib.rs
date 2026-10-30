@@ -351,4 +351,117 @@ mod tests {
         assert_eq!(h.sample_count_p(95).unwrap(), 96);
     }
 
+    #[test]
+    fn test_empty() {
+        let h = Histogram::new(Config::default());
+        assert_eq!(h.buckets(), 0);
+        assert_eq!(h.sample_count(), 0);
+        assert_eq!(h.average(), 0);
+        // no value yet: min is above max
+        assert_eq!(h.median(), 0);
+    }
+
+    #[test]
+    fn test_median_lt() {
+        let mut h = Histogram::new(Config::default());
+        h.append(10);
+        h.append(30);
+        assert_eq!(h.median_lt(), 20);
+        assert_eq!(h.buckets(), 1);
+    }
+
+    #[test]
+    fn test_scale_overflow() {
+        let mut s = Scale { sum: u64::MAX - 1, power: 0, count: 0 };
+        s.append(5);
+        assert_eq!(s, Scale { sum: 4, power: 1, count: 1 });
+        assert_eq!(s.avg(), ((u64::MAX as u128 + 4) / 1) as u64);
+
+        // power and count stay at their max
+        let mut s = Scale { sum: u64::MAX, power: u32::MAX, count: u32::MAX };
+        s.append(1);
+        assert_eq!(s, Scale { sum: 1, power: u32::MAX, count: u32::MAX });
+
+        // add: the counts summed while they fit, the sums carried into power
+        let mut s = Scale { sum: u64::MAX - 1, power: 1, count: 2 };
+        s.add(&Scale { sum: 3, power: 2, count: 3 });
+        assert_eq!(s, Scale { sum: 2, power: 4, count: 6 });
+        let mut s = Scale { sum: 0, power: u32::MAX, count: u32::MAX };
+        s.add(&Scale { sum: 1, power: 1, count: 1 });
+        assert_eq!(s, Scale { sum: 1, power: u32::MAX, count: u32::MAX });
+    }
+
+    #[test]
+    fn test_range() {
+        let mut r = Range::default();
+        r.check(10);
+        r.check(20);
+        r.check(5);
+        assert_eq!(r.to_string(), "5..20");
+        // 90%: 5% cut from each end of 5..20
+        assert!(r.check_in(90, 6));
+        assert!(r.check_in(90, 19));
+        assert!(!r.check_in(90, 5));
+        assert!(!r.check_in(60, 7));
+    }
+
+    #[test]
+    fn test_validate() {
+        assert_eq!(Config::default().validate(), Ok(()));
+        assert_eq!(Config { percentiles: vec![95], span_sec: 1, live_time_sec: 2 }.validate(), Ok(()));
+        assert_eq!(Config { percentiles: vec![100, 50], span_sec: 0, live_time_sec: 0 }.validate(),
+            Err("'percentile' mut be less than 100%, 'percentile' mut be great than 50%, \
+                 'span' mut be great than 0, 'live_time_sec' mut be great than 'span'".to_string()));
+        assert_eq!(Config { percentiles: vec![], span_sec: 5, live_time_sec: 5 }.validate(),
+            Err("'live_time_sec' mut be great than 'span'".to_string()));
+    }
+
+    #[test]
+    fn test_find() {
+        let c = Config { percentiles: vec![90, 95, 99], span_sec: 1, live_time_sec: 120 };
+        assert_eq!(c.find(90), Ok(1));
+        assert_eq!(c.find(99), Ok(3));
+        assert_eq!(c.find(2 /* by index */), Ok(3));
+        assert_eq!(c.find(80), Err("cant find 80% of 3".to_string()));
+        assert_eq!(c.find(3), Err("cant find #3 of 3".to_string()));
+        assert_eq!(Config::default().find(0), Err("cant find #0 of 0".to_string()));
+
+        let h = Histogram::new(c);
+        assert!(h.average_p(80).is_err());
+        assert!(h.sample_count_p(80).is_err());
+    }
+
+    #[test]
+    fn test_evict() {
+        let mut h = Histogram::new(Config { percentiles: vec![], span_sec: 1, live_time_sec: 2 });
+        // nine seconds in: the newest bucket is this second's, the oldest one past its lifetime
+        h.start = Instant::now() - std::time::Duration::from_secs(9);
+        let mut front = Bucket::new(9);
+        front.range = Range { min_max: (10, 20) };
+        let mut back = Bucket::new(5);
+        back.range = Range { min_max: (0, 2000) };
+        h.buckets.push_front(back);
+        h.buckets.push_front(front);
+        h.range = Range { min_max: (5, 1000) };
+
+        h.append(15);
+        assert_eq!(h.buckets(), 1);
+        // the range is looked up again from the buckets left
+        assert_eq!(h.range, Range { min_max: (10, 20) });
+        assert_eq!(h.median(), 15);
+        assert_eq!(h.sample_count(), 1);
+    }
+
+    #[test]
+    fn test_new_bucket() {
+        let mut h = Histogram::new(Config { percentiles: vec![], span_sec: 1, live_time_sec: 0 });
+        h.start = Instant::now() - std::time::Duration::from_secs(5);
+        h.buckets.push_front(Bucket::new(1));
+        h.append(7);
+        // a bucket older than the span: a new one in front, nothing evicted with no lifetime
+        assert_eq!(h.buckets(), 2);
+        assert_eq!(h.buckets.front().unwrap().time, 5);
+        assert_eq!(h.sample_count(), 1);
+    }
+
 }
