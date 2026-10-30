@@ -1,9 +1,12 @@
 [package]
 name = "shims"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
-authors = ["Vladimir Krinitsyn <v.krinitsyn@gmail.com>"]
+authors = ["Vladimir Krinitsyn <v.krinitsyn@gmail.com>", "support@dbinvent.com"]
 license = "MIT OR Apache-2.0"
 description = "A sliding window histogram data for metrics and telemetry"
-homepage = "https://github.com/vkrinitsyn/shim.git"
+homepage = "https://vkrinitsyn.github.io/"
 repository = "https://github.com/vkrinitsyn/shim.git"
+documentation = "https://github.com/vkrinitsyn/shim.git"
+keywords = ["histogram", "sliding", "average", "mdeium", "timeframe"]
+links = "https://dbinvent.com/"

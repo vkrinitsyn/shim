@@ -1,0 +1,19 @@
+# Dependabot: weekly updates of shims' Cargo dependencies. Security updates are
+# switched on in the repository's settings (Code security), not here.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    # one pull request for the minor and patch updates of a week; a major update
+    # comes on its own
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  # the actions .github/workflows runs (audit.yml: cargo audit and cargo geiger)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
