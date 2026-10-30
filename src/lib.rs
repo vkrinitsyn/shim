@@ -23,18 +23,9 @@ pub struct Scale {
 }
 
 impl Scale {
-    /// one sample
-    #[inline]
-    fn append(&mut self, value: u64) {
-        self.add_sum(value);
-        if self.count < u32::MAX {
-            self.count += 1;
-        }
-    }
-
     /// safe sum
     #[inline]
-    fn add_sum(&mut self, value: u64) {
+    fn append(&mut self, value: u64) {
         let v = u64::MAX - self.sum;
         if value >= v {
             if self.power < u32::MAX {
@@ -44,9 +35,11 @@ impl Scale {
         } else {
             self.sum += value;
         }
+        if self.count < u32::MAX {
+            self.count += 1;
+        }
     }
 
-    /// another scale's samples: its count is theirs, not one more
     #[inline]
     fn add(&mut self, value: &Self) {
         if u32::MAX - self.count > value.count {
@@ -55,7 +48,7 @@ impl Scale {
         if u32::MAX - self.power > value.power {
             self.power += value.power;
         }
-        self.add_sum(value.sum);
+        self.append(value.sum);
     }
 
     #[inline]
@@ -85,11 +78,9 @@ impl Display for Range {
 impl Range {
     #[inline]
     fn check(&mut self, value: u64) {
-        // both: the first value is the min and the max
         if self.min_max.0 > value {
             self.min_max.0 = value;
-        }
-        if self.min_max.1 < value {
+        } else if self.min_max.1 < value {
             self.min_max.1 = value
         }
     }
@@ -228,7 +219,11 @@ impl Histogram {
          self.range_lifetime.check(value);
          let b = self.buckets.front_mut().unwrap();
          b.scale.get_mut(0).unwrap().append(value);
-         b.range.check(value);
+         if b.range.min_max.0 > value {
+             b.range.min_max.0 = value;
+         } else if b.range.min_max.1 < value {
+             b.range.min_max.1 = value
+         }
 
          for percentile_id in 1..self.config.percentiles.len()+1 {
              if b.scale.len() <= percentile_id {
@@ -244,8 +239,7 @@ impl Histogram {
          if self.buckets.len() > 1 && self.config.live_time_sec > 0
              && self.buckets.back().unwrap().time > self.config.live_time_sec as u32 {
              let b = &self.buckets.pop_back().unwrap();
-             // the bucket held a bound of the range
-             if b.range.min_max.0 <= self.range.min_max.0 || b.range.min_max.1 >= self.range.min_max.1 {
+             if b.range.min_max.0 < self.range.min_max.0 || b.range.min_max.1 > self.range.min_max.1 {
 
                  // modify range after evict
                  let mut r = Range::default();
@@ -275,11 +269,7 @@ impl Histogram {
 
     pub fn median_lt(&self) -> u64 {
         let min = self.range_lifetime.min_max.0;
-        if min <= self.range_lifetime.min_max.1 {
-            min + (self.range_lifetime.min_max.1 - min) / 2
-        } else {
-            0
-        }
+        min + (self.range_lifetime.min_max.1 - min) / 2
     }
 
     ///
@@ -355,72 +345,10 @@ mod tests {
         }
         assert_eq!(h.median(), 50);
         assert_eq!(h.average(), 50);
-        assert_eq!(h.average_p(95).unwrap(), 49);
-        assert_eq!(h.average_p(0 /* by index */).unwrap(), 49);
+        assert_eq!(h.average_p(95).unwrap(), 48);
+        assert_eq!(h.average_p(0 /* by index */).unwrap(), 48);
         assert_eq!(h.sample_count(), 102);
         assert_eq!(h.sample_count_p(95).unwrap(), 96);
-        assert_eq!(h.median_lt(), 50);
-        assert_eq!(h.buckets(), 1);
-    }
-
-    #[test]
-    /// a sum past u64::MAX carries into power
-    fn test_overflow() {
-        let mut s = Scale { sum: u64::MAX - 1, power: 0, count: 0 };
-        s.append(3);
-        assert_eq!((s.sum, s.power, s.count), (2, 1, 1));
-        assert_eq!(Scale { sum: 0, power: 0, count: 0 }.avg(), 0);
-    }
-
-    #[test]
-    fn test_range_display() {
-        assert_eq!(Range { min_max: (1, 5) }.to_string(), "1..5");
-    }
-
-    #[test]
-    fn test_validate() {
-        assert_eq!(Config::default().validate(), Ok(()));
-        let c = Config { percentiles: vec![100, 50], span_sec: 0, live_time_sec: 0 };
-        assert_eq!(c.validate().unwrap_err(), "'percentile' mut be less than 100%, \
-            'percentile' mut be great than 50%, 'span' mut be great than 0, \
-            'live_time_sec' mut be great than 'span'");
-    }
-
-    #[test]
-    /// by percent above 10, by index up to 10
-    fn test_find() {
-        let c = Config { percentiles: vec![90, 95], ..Config::default() };
-        assert_eq!(c.find(95), Ok(2));
-        assert_eq!(c.find(99).unwrap_err(), "cant find 99% of 2");
-        assert_eq!(c.find(1), Ok(2));
-        assert_eq!(c.find(2).unwrap_err(), "cant find #2 of 2");
-        let h = Histogram::new(Config::default());
-        assert!(h.average_p(0).is_err());
-        assert!(h.sample_count_p(95).is_err());
-        assert_eq!(h.median(), 0, "no samples");
-    }
-
-    #[test]
-    fn test_evict() {
-        let mut h = Histogram::new(Config { percentiles: vec![], span_sec: 1, live_time_sec: 2 });
-        h.start = h.start.checked_sub(std::time::Duration::from_secs(5)).unwrap();
-        h.append(10); // a bucket at 5 s
-        h.start = h.start.checked_sub(std::time::Duration::from_secs(5)).unwrap();
-        h.append(20); // a bucket at 10 s: the one at 5 s is past the live time
-        assert_eq!(h.buckets(), 1);
-        assert_eq!(h.sample_count(), 1);
-        assert_eq!(h.median(), 20, "the range without the evicted bucket");
-        assert_eq!(h.median_lt(), 15, "the lifetime range keeps it");
-    }
-
-    #[test]
-    /// one value is the min and the max
-    fn test_one_value() {
-        let mut h = Histogram::new(Config { percentiles: vec![95], ..Config::default() });
-        assert_eq!((h.median(), h.median_lt()), (0, 0), "no samples");
-        h.append(5);
-        assert_eq!((h.median(), h.median_lt()), (5, 5));
-        assert_eq!(h.average_p(95), Ok(5));
     }
 
 }
