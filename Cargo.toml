@@ -9,4 +9,3 @@ homepage = "https://vkrinitsyn.github.io/"
 repository = "https://github.com/vkrinitsyn/shim.git"
 documentation = "https://github.com/vkrinitsyn/shim.git"
 keywords = ["histogram", "sliding", "average", "mdeium", "timeframe"]
-links = "https://dbinvent.com/"
