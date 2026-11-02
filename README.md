@@ -1,7 +1,7 @@
 # shim
 
 [![ci](https://github.com/vkrinitsyn/shim/actions/workflows/ci.yml/badge.svg)](https://github.com/vkrinitsyn/shim/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/vkrinitsyn/shim/graph/badge.svg)](https://codecov.io/gh/vkrinitsyn/shim)
+[![coverage](https://raw.githubusercontent.com/vkrinitsyn/shim/badges/coverage.svg?sanitize=true)](https://github.com/vkrinitsyn/shim/actions/workflows/ci.yml)
 [![audit](https://github.com/vkrinitsyn/shim/actions/workflows/audit.yml/badge.svg)](https://github.com/vkrinitsyn/shim/actions/workflows/audit.yml)
 [![crates.io](https://img.shields.io/crates/v/shims.svg)](https://crates.io/crates/shims)
 [![docs.rs](https://docs.rs/shims/badge.svg)](https://docs.rs/shims)

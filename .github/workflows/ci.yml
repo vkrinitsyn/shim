@@ -1,8 +1,8 @@
 name: ci
 
-# The tests, and their line coverage: under 90% fails the run. The coverage goes to
-# Codecov (the README badge) through GitHub's OIDC token - no secret; the repository is
-# enabled once at codecov.io.
+# The tests, and their line coverage: under 90% fails the run. The coverage badge is our
+# own, no third party: drawn from lcov.info and kept on the `badges` branch (the
+# coverage job's last step).
 on:
   push:
     branches-ignore: ["dependabot/**"]   # their pull request runs it
@@ -29,8 +29,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write   # Codecov's OIDC upload
+      contents: write   # the coverage badge's push, to the badges branch
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -41,9 +40,18 @@ jobs:
           tool: cargo-llvm-cov
       # 90: the line coverage measured 99.62% when this gate came in
       - run: cargo llvm-cov --lcov --output-path lcov.info --fail-under-lines 90
-      - uses: codecov/codecov-action@v7
-        with:
-          files: lcov.info
-          use_oidc: true
-          # a fork's pull request has no token: the gate above holds without the upload
-          fail_ci_if_error: false
+      # [coverage] our own badge, no third party: lcov.info's line coverage, drawn by
+      # .github/coverage-badge.py and kept on the `badges` branch - one commit, replaced
+      # each time - which the README shows. On a push to the default branch only: a pull
+      # request measures and gates, no more
+      - name: coverage badge
+        if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pct=$(python3 .github/coverage-badge.py lcov.info /tmp/badges/coverage.svg)
+          cd /tmp/badges
+          git init -q -b badges
+          git add coverage.svg
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "coverage ${pct}%"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
